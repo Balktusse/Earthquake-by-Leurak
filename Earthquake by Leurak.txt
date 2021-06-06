@@ -1,0 +1,59 @@
+#include <Windows.h>
+#include <stdio.h>
+
+#include "resource.h"
+
+EXTERN_C IMAGE_DOS_HEADER __ImageBase;
+DWORD WINAPI soundThread(LPVOID parameter);
+int random();
+
+BOOL endofsound = FALSE;
+HCRYPTPROV prov;
+
+void main() {
+	if (!CryptAcquireContext(&prov, NULL, NULL, PROV_RSA_FULL, CRYPT_SILENT | CRYPT_VERIFYCONTEXT))
+		ExitProcess(1);
+
+	CreateThread(NULL, 0, &soundThread, NULL, 0, NULL);
+	Sleep(1600);
+
+	HWND desktop = GetDesktopWindow();
+	HDC dc = GetWindowDC(desktop);
+
+	RECT rekt;
+	GetWindowRect(desktop, &rekt);
+
+	int w = rekt.right - rekt.left;
+	int h = rekt.bottom - rekt.top;
+
+	HBITMAP screenshot = CreateCompatibleBitmap(dc, w, h);
+	HDC dc2 = CreateCompatibleDC(dc);
+	SelectObject(dc2, screenshot);
+
+	while (!endofsound) {
+		BitBlt(dc2, 0, 0, w, h, dc, 0, 0, SRCCOPY);
+		BitBlt(dc, 0, 0, w, h, dc2, (random() % 30) - 15, (random() % 30) - 15, SRCCOPY);
+		Sleep(50);
+		BitBlt(dc, 0, 0, w, h, dc2, 0, 0, SRCCOPY);
+		Sleep(50);
+	}
+
+	HBITMAP img = (HBITMAP)LoadImage((HINSTANCE)&__ImageBase, MAKEINTRESOURCE(IDB_BITMAP1), IMAGE_BITMAP, 0, 0, LR_LOADTRANSPARENT);
+	HDC dc3 = CreateCompatibleDC(dc);
+	SelectObject(dc3, img);
+	TransparentBlt(dc, w / 2 - 380 / 2, h / 2 - 59 / 2, 380, 59, dc3, 0, 0, 380, 59, 0xff00ff);
+
+	ExitProcess(0);
+}
+
+DWORD WINAPI soundThread(LPVOID parameter) {
+	PlaySound(MAKEINTRESOURCE(IDR_WAVE1), (HMODULE)&__ImageBase, SND_SYNC | SND_RESOURCE);
+	endofsound = TRUE;
+	return 0;
+}
+
+int random() {
+	int out;
+	CryptGenRandom(prov, sizeof(out), (BYTE *)(&out));
+	return out & 0x7fffffff;
+}
